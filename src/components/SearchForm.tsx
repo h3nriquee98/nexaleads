@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BR_STATES, POPULAR_NICHES } from "@/lib/niches";
+import { BR_STATES, NICHE_GROUPS, POPULAR_NICHES } from "@/lib/niches";
 import { DEFAULT_LIMIT, MAX_NICHES, validateSearch } from "@/lib/validation";
 import type { SearchParams } from "@/lib/types";
 import { CheckIcon, LoaderIcon, MapPinIcon, PlusIcon, SearchIcon, XIcon } from "./Icons";
@@ -26,7 +26,7 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
   const [errors, setErrors] = useState<Errors>({});
 
   const isBrazil = /^(brasil|brazil)$/i.test(country.trim());
-  const customNiches = niches.filter((n) => !(POPULAR_NICHES as readonly string[]).includes(n));
+  const customNiches = niches.filter((n) => !POPULAR_NICHES.includes(n));
 
   function toggleNiche(niche: string) {
     setErrors((e) => ({ ...e, niches: undefined }));
@@ -163,27 +163,48 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
               {niches.length} selecionado{niches.length === 1 ? "" : "s"} · máx. {MAX_NICHES}
             </span>
           </legend>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Nichos populares">
-            {POPULAR_NICHES.map((niche) => {
-              const active = niches.includes(niche);
-              return (
-                <button type="button" key={niche} className="chip" aria-pressed={active} onClick={() => toggleNiche(niche)}>
-                  {active && <CheckIcon size={13} />}
-                  {niche}
-                </button>
-              );
-            })}
-            {customNiches.map((niche) => (
-              <button type="button" key={niche} className="chip" aria-pressed="true" onClick={() => toggleNiche(niche)} aria-label={`Remover nicho ${niche}`}>
-                {niche}
-                <XIcon size={13} />
-              </button>
+          <div className="space-y-3">
+            {NICHE_GROUPS.map((group) => (
+              <div key={group.label} role="group" aria-label={group.label} className="grid gap-1.5 sm:grid-cols-[9.5rem_1fr] sm:items-start">
+                <span className="pt-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{group.label}</span>
+                <div className="flex flex-wrap gap-2">
+                  {group.niches.map((niche) => {
+                    const active = niches.includes(niche);
+                    return (
+                      <button type="button" key={niche} className="chip" aria-pressed={active} onClick={() => toggleNiche(niche)}>
+                        {active && <CheckIcon size={13} />}
+                        {niche}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
+            {customNiches.length > 0 && (
+              <div role="group" aria-label="Nichos personalizados" className="grid gap-1.5 sm:grid-cols-[9.5rem_1fr] sm:items-start">
+                <span className="pt-1.5 text-xs font-semibold uppercase tracking-wide text-faint">Personalizados</span>
+                <div className="flex flex-wrap gap-2">
+                  {customNiches.map((niche) => (
+                    <button
+                      type="button"
+                      key={niche}
+                      className="chip"
+                      aria-pressed="true"
+                      onClick={() => toggleNiche(niche)}
+                      aria-label={`Remover nicho ${niche}`}
+                    >
+                      {niche}
+                      <XIcon size={13} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-3 flex gap-2">
             <input
               className="field"
-              placeholder="Nicho personalizado (ex.: Pet shops, Floriculturas…)"
+              placeholder="Outro nicho (ex.: Chaveiros, Gráficas, Hotéis…)"
               value={custom}
               maxLength={60}
               onChange={(e) => setCustom(e.target.value)}

@@ -46,7 +46,7 @@ describe("gerar abordagem", () => {
     expect(nicheBenefit({ niche: "Barbearias", category: null })).toContain("agendamentos");
     expect(nicheBenefit({ niche: "Profissionais autônomos", category: null })).toContain("seus serviços");
     expect(nicheBenefit({ niche: "Dentistas", category: null })).toContain("consultas");
-    expect(nicheBenefit({ niche: "Pet shops", category: null })).toContain("novos clientes");
+    expect(nicheBenefit({ niche: "Chaveiros", category: null })).toContain("novos clientes");
   });
 
   it("saudação conforme o horário e link do WhatsApp com texto", () => {

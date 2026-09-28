@@ -23,17 +23,24 @@ type PitchLead = Pick<Lead, "name" | "niche" | "category" | "city" | "searchLoca
 
 /** Benefício de ter um site, adaptado ao nicho. */
 const NICHE_BENEFITS: { match: string[]; benefit: string }[] = [
-  { match: ["pizzar", "restaurant", "lanchon", "hamburg", "bares", "cafe", "padar", "comida", "delivery", "marmit"], benefit: "mostrar o cardápio online e receber mais pedidos" },
+  // Vem primeiro para "estética automotiva" não cair em beleza.
+  { match: ["lava-rapido", "lava rapido", "lava jato", "lavagem automotiva", "estetica automotiva"], benefit: "receber agendamentos online e mostrar seus serviços e preços" },
+  { match: ["pizzar", "restaurant", "lanchon", "hamburg", "bares", "cafe", "padar", "comida", "delivery", "marmit", "acai", "sorvet"], benefit: "mostrar o cardápio online e receber mais pedidos" },
   { match: ["docer", "confeit", "bolo", "doce"], benefit: "mostrar o cardápio de doces e receber mais encomendas" },
   { match: ["salao", "saloes", "beleza", "barbear", "estetic", "manicure", "cabelei", "sobrancel"], benefit: "receber agendamentos online e mostrar seus serviços e preços" },
   { match: ["clinic", "dentist", "odonto", "medic", "fisio", "psicolog", "nutri", "veterin"], benefit: "facilitar o agendamento de consultas e transmitir mais confiança aos pacientes" },
   { match: ["academ", "crossfit", "pilates", "fitness"], benefit: "divulgar planos e horários e captar novas matrículas" },
-  { match: ["fotograf", "video"], benefit: "apresentar um portfólio profissional e fechar mais trabalhos" },
+  { match: ["fotograf", "video", "tatuag", "tattoo"], benefit: "apresentar um portfólio profissional e fechar mais trabalhos" },
   { match: ["decora", "buffet", "evento", "festa", "cerimon"], benefit: "mostrar seu portfólio e receber pedidos de orçamento todos os dias" },
-  { match: ["roupa", "loja", "moda", "boutique", "calcad", "acessor"], benefit: "ter uma vitrine online com seus produtos e vender também pela internet" },
+  { match: ["pet shop", "petshop", "banho e tosa"], benefit: "receber agendamentos de banho e tosa e mostrar seus produtos" },
+  { match: ["floric", "flores"], benefit: "mostrar seus arranjos e receber mais encomendas" },
+  { match: ["roupa", "loja", "moda", "boutique", "calcad", "acessor", "otica"], benefit: "ter uma vitrine online com seus produtos e vender também pela internet" },
   { match: ["imobili", "imove", "corretor"], benefit: "divulgar seus imóveis e receber contatos de interessados" },
   { match: ["oficina", "mecanic", "funilar", "auto center", "autopec", "pneu"], benefit: "receber pedidos de orçamento e mostrar seus serviços" },
-  { match: ["constru", "reforma", "engenharia", "arquitet", "empreit"], benefit: "mostrar suas obras concluídas e receber pedidos de orçamento" },
+  { match: ["constru", "reforma", "engenharia", "arquitet", "empreit", "marcenar", "vidrac", "serralher"], benefit: "mostrar suas obras concluídas e receber pedidos de orçamento" },
+  { match: ["advog", "contab", "juridic", "consultori"], benefit: "transmitir credibilidade e receber contatos de novos clientes" },
+  { match: ["escola", "idioma", "curso"], benefit: "divulgar seus cursos e captar novos alunos" },
+  { match: ["lavander"], benefit: "receber pedidos e mostrar seus serviços e preços" },
   { match: ["autonom", "eletricista", "encanador", "pintor", "jardin", "diarista", "freelanc"], benefit: "ser encontrado por quem procura seus serviços e receber mais pedidos" },
 ];
 
