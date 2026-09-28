@@ -1,5 +1,6 @@
 import "server-only";
 import type { SearchParams } from "@/lib/types";
+import { fetchLimit } from "@/lib/validation";
 import type { RawPlace } from "@/lib/normalize";
 
 /**
@@ -53,7 +54,7 @@ function slug(value: string): string {
 }
 
 export function generateDemoPlaces(params: SearchParams, now = new Date()): RawPlace[] {
-  const perNiche = Math.max(1, Math.ceil(params.limit / params.niches.length));
+  const perNiche = Math.max(1, Math.ceil(fetchLimit(params) / params.niches.length));
   const places: RawPlace[] = [];
 
   for (const niche of params.niches) {

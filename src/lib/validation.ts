@@ -60,10 +60,12 @@ export function validateSearch(input: unknown, maxLimit = 100): ValidationResult
   }
   limit = Math.min(limit, cap);
 
-  const onlyNoSite = raw.onlyNoSite === true || raw.onlyNoSite === "true" || raw.onlyNoSite === "1";
+  const flag = (v: unknown) => v === true || v === "true" || v === "1";
+  const onlyNoSite = flag(raw.onlyNoSite);
+  const onlyWhatsApp = flag(raw.onlyWhatsApp);
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { city, state, country, niches, limit, onlyNoSite } };
+  return { ok: true, value: { city, state, country, niches, limit, onlyNoSite, onlyWhatsApp } };
 }
 
 export function searchKey(params: SearchParams): string {
@@ -74,5 +76,16 @@ export function searchKey(params: SearchParams): string {
     [...params.niches].map((n) => n.toLowerCase()).sort(),
     params.limit,
     params.onlyNoSite,
+    params.onlyWhatsApp,
   ]);
+}
+
+/**
+ * O Google Maps não permite filtrar por WhatsApp, então com "apenas com WhatsApp" buscamos
+ * o dobro de empresas e o servidor entrega até `limit` leads que tenham WhatsApp.
+ */
+export const WHATSAPP_FETCH_MULTIPLIER = 2;
+
+export function fetchLimit(params: Pick<SearchParams, "limit" | "onlyWhatsApp">): number {
+  return params.onlyWhatsApp ? params.limit * WHATSAPP_FETCH_MULTIPLIER : params.limit;
 }

@@ -23,6 +23,7 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
   const [custom, setCustom] = useState("");
   const [limit, setLimit] = useState(String(initial?.limit ?? DEFAULT_LIMIT));
   const [onlyNoSite, setOnlyNoSite] = useState(initial?.onlyNoSite ?? false);
+  const [onlyWhatsApp, setOnlyWhatsApp] = useState(initial?.onlyWhatsApp ?? false);
   const [errors, setErrors] = useState<Errors>({});
 
   const isBrazil = /^(brasil|brazil)$/i.test(country.trim());
@@ -55,7 +56,7 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
     e.preventDefault();
     if (busy) return;
     const pending = custom.trim() ? [...niches, custom.trim()] : niches;
-    const result = validateSearch({ city, state, country, niches: pending, limit, onlyNoSite }, maxLeads);
+    const result = validateSearch({ city, state, country, niches: pending, limit, onlyNoSite, onlyWhatsApp }, maxLeads);
     if (!result.ok) {
       setErrors(result.errors);
       return;
@@ -247,30 +248,22 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
           </p>
         </div>
 
-        <div className="sm:col-span-5 sm:pt-7">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={onlyNoSite}
-            onClick={() => setOnlyNoSite((v) => !v)}
-            className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
-              onlyNoSite ? "border-emerald-400/50 bg-emerald-400/10" : "border-line-strong bg-white/[0.02] hover:border-indigo-300/40"
-            }`}
-          >
-            <span
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${onlyNoSite ? "bg-emerald-400" : "bg-white/15"}`}
-              aria-hidden
-            >
-              <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-all ${onlyNoSite ? "left-[22px]" : "left-0.5"}`} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold">Buscar apenas empresas sem site</span>
-              <span className="block text-xs text-muted">O Google Maps Scraper já filtra na busca: só vêm empresas sem site.</span>
-            </span>
-          </button>
+        <div className="grid gap-3 sm:col-span-8 sm:grid-cols-2 sm:pt-7">
+          <ToggleCard
+            checked={onlyNoSite}
+            onChange={setOnlyNoSite}
+            title="Buscar apenas empresas sem site"
+            description="O Google Maps Scraper já filtra na busca: só vêm empresas sem site."
+          />
+          <ToggleCard
+            checked={onlyWhatsApp}
+            onChange={setOnlyWhatsApp}
+            title="Apenas empresas com WhatsApp"
+            description="Descarta quem não tem WhatsApp nem celular. Busca o dobro de empresas para completar a quantidade (consome mais créditos)."
+          />
         </div>
 
-        <div className="flex items-end sm:col-span-3 sm:justify-end">
+        <div className="flex items-end sm:col-span-12 sm:justify-end">
           <button type="submit" className="btn btn-primary h-12 w-full px-6 text-base sm:w-auto" disabled={busy}>
             {busy ? <LoaderIcon className="animate-spin" size={18} /> : <SearchIcon size={18} />}
             {busy ? "Buscando…" : "Encontrar leads"}
@@ -278,5 +271,37 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
         </div>
       </div>
     </form>
+  );
+}
+
+function ToggleCard({
+  checked,
+  onChange,
+  title,
+  description,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+        checked ? "border-emerald-400/50 bg-emerald-400/10" : "border-line-strong bg-white/[0.02] hover:border-indigo-300/40"
+      }`}
+    >
+      <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-emerald-400" : "bg-white/15"}`} aria-hidden>
+        <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-all ${checked ? "left-[22px]" : "left-0.5"}`} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block text-xs text-muted">{description}</span>
+      </span>
+    </button>
   );
 }

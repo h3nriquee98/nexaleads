@@ -99,6 +99,37 @@ test("buscar apenas empresas sem site envia o filtro ao Apify", async ({ page, r
   await expect(page.getByRole("switch", { name: /Buscar apenas empresas sem site/ })).toHaveAttribute("aria-checked", "true");
 });
 
+test("apenas empresas com WhatsApp descarta quem não tem WhatsApp", async ({ page, request }) => {
+  await login(page, BASE);
+  await page.getByRole("textbox", { name: "Cidade" }).fill("Franca");
+  await page.getByLabel("Estado").selectOption("SP");
+  const noSite = page.getByRole("switch", { name: /Buscar apenas empresas sem site/ });
+  if ((await noSite.getAttribute("aria-checked")) === "true") await noSite.click();
+  const whats = page.getByRole("switch", { name: /Apenas empresas com WhatsApp/ });
+  await expect(whats).toHaveAttribute("aria-checked", "false");
+  await whats.click();
+  await page.getByLabel("Nicho personalizado").fill("Sorveterias");
+  await page.getByLabel("Nicho personalizado").press("Enter");
+  await page.getByRole("button", { name: "Encontrar leads" }).click();
+  await expect(page.getByText(/Buscando Sorveterias com WhatsApp em Franca - SP/)).toBeVisible();
+  await expect(page.locator("article").first()).toBeVisible({ timeout: 30_000 });
+
+  // Pede o dobro ao Apify para compensar os descartados
+  const last = await (await request.get(`${MOCK}/__last-input`)).json();
+  expect(last.input.searchStringsArray).toEqual(["Sorveterias"]);
+  expect(last.input.maxCrawledPlacesPerSearch).toBe(40);
+  expect(last.query.maxItems).toBe("40");
+  expect(last.input).not.toHaveProperty("website");
+
+  // Fixo ("Com Site Teste") e sem telefone ("Só Instagram") ficam de fora
+  const cards = page.locator("article");
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator("article h3")).toHaveText(["Sorveteria Sem Site Teste", "Sorveteria Cidade Vizinha"]);
+  await expect(page.getByText("WhatsApp não identificado")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Com WhatsApp" })).toHaveAttribute("aria-pressed", "true");
+  await page.screenshot({ path: `${OUT}/15-apenas-whatsapp.png` });
+});
+
 test("mensagens de erro: limite de requisições e ausência de resultados", async ({ page }) => {
   await login(page, BASE);
   await search(page, "Limite");

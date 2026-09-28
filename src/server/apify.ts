@@ -1,6 +1,7 @@
 import "server-only";
 import type { ApifyConfig } from "./config";
 import type { SearchParams } from "@/lib/types";
+import { fetchLimit } from "@/lib/validation";
 import type { RawPlace } from "@/lib/normalize";
 
 export class ApifyError extends Error {
@@ -98,7 +99,7 @@ async function apifyFetch(config: ApifyConfig, path: string, init: RequestInit =
 
 /** Monta o input do Actor Google Maps Scraper (compass/crawler-google-places). */
 export function buildActorInput(params: SearchParams, config: ApifyConfig): Record<string, unknown> {
-  const perNiche = Math.max(1, Math.ceil(params.limit / params.niches.length));
+  const perNiche = Math.max(1, Math.ceil(fetchLimit(params) / params.niches.length));
   const isBrazil = /^(brasil|brazil)$/i.test(params.country);
   return {
     searchStringsArray: params.niches,
@@ -135,7 +136,7 @@ export async function startRun(params: SearchParams, config: ApifyConfig): Promi
   const query = new URLSearchParams({
     timeout: String(config.runTimeoutSecs),
     // Limita resultados cobrados em Actors "pay per result".
-    maxItems: String(params.limit),
+    maxItems: String(fetchLimit(params)),
   });
   if (config.maxChargeUsd) query.set("maxTotalChargeUsd", String(config.maxChargeUsd));
   const body = await apifyFetch(config, `/v2/acts/${encodeURIComponent(config.actorId)}/runs?${query}`, {

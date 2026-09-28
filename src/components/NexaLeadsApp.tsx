@@ -170,14 +170,14 @@ export default function NexaLeadsApp() {
         setSearch({
           phase: "error",
           code: "NO_RESULTS",
-          message: `Nenhuma empresa${params.onlyNoSite ? " sem site" : ""} encontrada para ${params.niches.join(", ")} em ${params.city} - ${params.state}. Tente outro nicho, uma cidade vizinha ou um termo mais genérico${
-            params.onlyNoSite ? ", ou desligue a opção “Buscar apenas empresas sem site”" : ""
+          message: `Nenhuma empresa${params.onlyNoSite ? " sem site" : ""}${params.onlyWhatsApp ? " com WhatsApp" : ""} encontrada para ${params.niches.join(", ")} em ${params.city} - ${params.state}. Tente outro nicho, uma cidade vizinha ou um termo mais genérico${
+            params.onlyNoSite || params.onlyWhatsApp ? ", ou desligue as opções de filtro da busca" : ""
           }.`,
           params,
         });
         return;
       }
-      setFilters({ ...DEFAULT_FILTERS, onlyLastSearch: true, onlyNoSite: params.onlyNoSite });
+      setFilters({ ...DEFAULT_FILTERS, onlyLastSearch: true, onlyNoSite: params.onlyNoSite, withWhatsApp: params.onlyWhatsApp });
       setPage(1);
       const noSite = found.filter((l) => l.siteStatus === "sem_site").length;
       push("success", `${found.length} lead${found.length === 1 ? "" : "s"} encontrado${found.length === 1 ? "" : "s"} · ${noSite} sem site.`);
@@ -196,6 +196,7 @@ export default function NexaLeadsApp() {
         country: params.country,
         limit: String(params.limit),
         onlyNoSite: params.onlyNoSite ? "1" : "0",
+        onlyWhatsApp: params.onlyWhatsApp ? "1" : "0",
       });
       params.niches.forEach((n) => qs.append("niche", n));
       let failures = 0;
@@ -452,7 +453,8 @@ export default function NexaLeadsApp() {
               <div>
                 <p className="font-semibold">
                   Buscando {search.params.niches.join(", ")}
-                  {search.params.onlyNoSite ? " sem site" : ""} em {search.params.city} - {search.params.state}
+                  {search.params.onlyNoSite ? " sem site" : ""}
+                  {search.params.onlyWhatsApp ? " com WhatsApp" : ""} em {search.params.city} - {search.params.state}
                 </p>
                 <p className="text-sm text-muted">
                   {search.message ?? "Processando…"} · {formatElapsed(now - search.startedAt)}

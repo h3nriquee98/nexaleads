@@ -74,6 +74,8 @@ export interface SearchParams {
   limit: number;
   /** Buscar somente empresas sem site (filtro aplicado no Actor e conferido no servidor). */
   onlyNoSite: boolean;
+  /** Manter só empresas com WhatsApp (confirmado ou celular). Filtro aplicado no servidor. */
+  onlyWhatsApp: boolean;
 }
 
 export type SearchResponse =

@@ -10,6 +10,7 @@ Aplicação web de uso interno da **Nexa Agency** para encontrar empresas e poss
 
 - **Busca** por cidade, estado (UF) e país, com um ou vários nichos populares ou um nicho personalizado. Também aceita digitar “Franca, SP” direto no campo cidade.
 - **Buscar apenas empresas sem site**: opção no formulário que envia o filtro `website: "withoutWebsite"` ao Google Maps Scraper. O Apify traz só empresas sem site, e o servidor confere de novo antes de mostrar os resultados.
+- **Apenas empresas com WhatsApp**: opção ao lado da anterior. Descarta leads sem WhatsApp confirmado e sem celular (fixos e sem telefone). O Google Maps não tem esse filtro, então o app busca o dobro de empresas no Apify e entrega até a quantidade pedida. Isso consome mais créditos.
 - **Quantidade de leads** configurável, com limite máximo por busca para controlar custos.
 - **Integração segura com Apify**: o token fica só no servidor (variáveis de ambiente) e nunca vai para o navegador.
 - **Pontuação de 0 a 100** e ordenação automática, com etiqueta **“Sem site”**.

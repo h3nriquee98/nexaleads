@@ -5,7 +5,7 @@ import { generateDemoPlaces } from "@/server/demo";
 import { requestIsAuthorized } from "@/server/auth";
 import { forgetRun, forgetRunId, getRecentRun, isSameOrigin, rateLimit, rememberRun } from "@/server/guards";
 import { normalizePlaces } from "@/lib/normalize";
-import { searchKey, validateSearch } from "@/lib/validation";
+import { fetchLimit, searchKey, validateSearch } from "@/lib/validation";
 import type { Lead, SearchParams, SearchResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +29,17 @@ function handleError(error: unknown) {
   return fail("INTERNAL_ERROR", "Erro interno ao processar a busca. Tente novamente.", 500);
 }
 
-/** Confere no servidor: com "apenas sem site", nenhum lead com site (ou não identificado) passa. */
+/**
+ * Filtros aplicados no servidor:
+ * - "apenas sem site": nenhum lead com site (ou não identificado) passa;
+ * - "apenas com WhatsApp": só WhatsApp confirmado pela fonte ou celular (provável).
+ * Como a lista já vem ordenada pela pontuação, o corte em `limit` mantém os melhores.
+ */
 function applySiteFilter(leads: Lead[], params: SearchParams): Lead[] {
-  return params.onlyNoSite ? leads.filter((l) => l.siteStatus === "sem_site") : leads;
+  let result = leads;
+  if (params.onlyNoSite) result = result.filter((l) => l.siteStatus === "sem_site");
+  if (params.onlyWhatsApp) result = result.filter((l) => l.whatsappStatus !== "nao").slice(0, params.limit);
+  return result;
 }
 
 function firstValidationError(errors: Partial<Record<keyof SearchParams, string>>): string {
@@ -104,6 +112,7 @@ export async function GET(request: Request) {
       niches: url.searchParams.getAll("niche"),
       limit: url.searchParams.get("limit"),
       onlyNoSite: url.searchParams.get("onlyNoSite"),
+      onlyWhatsApp: url.searchParams.get("onlyWhatsApp"),
     },
     config.maxLeads,
   );
@@ -120,7 +129,7 @@ export async function GET(request: Request) {
       return fail("APIFY_RUN_FAILED", `A execução do Actor falhou${run.statusMessage ? `: ${run.statusMessage}` : "."} Tente novamente.`, 502);
     }
 
-    const items = await getRunItems(runId, params.limit, config);
+    const items = await getRunItems(runId, fetchLimit(params), config);
     const leads = applySiteFilter(normalizePlaces(items, { ...params, source: "apify" }), params);
     const partial = run.status !== "SUCCEEDED";
     if (partial) forgetRun(searchKey(params));
