@@ -35,7 +35,7 @@ test("login, senha errada, redirecionamento e sair", async ({ page }) => {
   await page.getByLabel("Senha").fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(`${BASE}/`);
-  await expect(page.getByRole("heading", { name: "Encontrar novos leads" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Bem-vindo ao/ })).toBeVisible();
   const cookie = (await page.context().cookies()).find((c) => c.name === "nexaleads_session")!;
   expect(cookie.httpOnly).toBe(true);
   expect(cookie.sameSite).toBe("Lax");

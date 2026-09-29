@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AlertIcon, CheckIcon, InfoIcon, XIcon } from "./Icons";
 
 export type ToastKind = "success" | "error" | "info";
@@ -22,7 +22,7 @@ export function useToasts() {
     },
     [dismiss],
   );
-  return { toasts, push, dismiss };
+  return useMemo(() => ({ toasts, push, dismiss }), [toasts, push, dismiss]);
 }
 
 const STYLE: Record<ToastKind, string> = {

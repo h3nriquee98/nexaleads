@@ -8,6 +8,13 @@ Aplicação web de uso interno da **Nexa Agency** para encontrar empresas e poss
 
 ## Funcionalidades
 
+O app tem um **menu lateral** (no celular, abre como gaveta pelo botão ☰) com quatro páginas:
+
+- **Início**: resumo com leads na base, empresas sem site, clientes fechados, recebido no mês, melhores oportunidades (com botão de abordagem), funil de prospecção, leads por nicho e financeiro do mês.
+- **Buscar leads**: formulário de busca e resultados da última busca. A busca continua rodando se você mudar de página.
+- **Meus leads**: todos os leads salvos, com filtros, exportação e ações.
+- **Financeiro**: receitas (vendas e mensalidades) e despesas por mês, com recebido, a receber, despesas, lucro, mensalidades, ticket médio, atrasados, gráfico dos últimos 6 meses, geração das mensalidades do mês seguinte e exportação em CSV. Quando uma receita é vinculada a um lead, ele é marcado como “Cliente”. Os dados ficam salvos apenas neste navegador.
+
 - **Busca** por cidade, estado (UF) e país, com um ou vários nichos populares ou um nicho personalizado. Também aceita digitar “Franca, SP” direto no campo cidade.
 - **Buscar apenas empresas sem site**: opção no formulário que envia o filtro `website: "withoutWebsite"` ao Google Maps Scraper. O Apify traz só empresas sem site, e o servidor confere de novo antes de mostrar os resultados.
 - **Apenas empresas com WhatsApp**: opção ao lado da anterior. Descarta leads sem WhatsApp confirmado e sem celular (fixos e sem telefone). O Google Maps não tem esse filtro, então o app busca o dobro de empresas no Apify e entrega até a quantidade pedida. Isso consome mais créditos.
@@ -181,11 +188,14 @@ Os testes E2E cobrem: busca por cidade e nicho, estado de carregamento, polling 
 ```
 src/
   app/
+    (app)/                      # páginas com menu lateral: / (Início), /buscar, /leads, /financeiro
     api/search-leads/route.ts   # rota segura: inicia, acompanha e cancela buscas
-    api/status/route.ts         # informa modo demo/Apify (sem expor o token)
-    layout.tsx, page.tsx, globals.css
-  components/                   # interface (busca, dashboard, filtros, cards, tabela, toasts)
-  lib/                          # regras compartilhadas: pontuação, normalização, telefone, filtros, exportação, storage
+    api/status/route.ts         # informa as fontes configuradas (sem expor chaves)
+    login/                      # tela de login
+  components/
+    app/                        # estado compartilhado (AppProvider), menu lateral e estrutura
+    views/                      # páginas: Início, Buscar leads, Meus leads, Financeiro
+  lib/                          # regras: pontuação, normalização, telefone, filtros, exportação, financeiro, storage
   server/                       # somente servidor: config, cliente Apify, dados demo, proteções
 tests/                          # testes unitários (Vitest)
 e2e/                            # testes E2E (Playwright) + API do Apify simulada

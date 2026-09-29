@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
-import { login } from "./helpers";
+import { login, openMenuItem } from "./helpers";
 
 const BASE = "http://localhost:3100";
 const OUT = process.env.E2E_OUT_DIR ?? "test-results";
@@ -14,7 +14,7 @@ async function scores(page: Page) {
 test("fluxo completo no modo demonstração", async ({ page }) => {
   await login(page, BASE);
   await expect(page.getByText("Modo demonstração").first()).toBeVisible();
-  await expect(page.getByText("Nenhum lead ainda")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resultados da última busca" })).toHaveCount(0);
 
   // Validação dos campos
   await page.getByRole("button", { name: "Encontrar leads" }).click();
@@ -143,7 +143,10 @@ test("fluxo completo no modo demonstração", async ({ page }) => {
   await page.reload();
   await expect(page.getByLabel(`Status do lead ${name}`)).toHaveValue("contatado");
   await expect(page.getByLabel(`Status do lead ${name2}`)).toHaveValue("cliente");
-  await expect(page.getByRole("region", { name: "Leads por status" }).getByText("Contatado")).toBeVisible();
+  await openMenuItem(page, "Início");
+  await expect(page.getByRole("region", { name: "Funil de prospecção" }).getByText("Contatado")).toBeVisible();
+  await openMenuItem(page, "Buscar leads");
+  await expect(page.locator("article").first()).toBeVisible();
 
   // Descartar lead
   await page.locator("article", { hasText: name }).getByRole("button", { name: /Descartar/ }).click();
