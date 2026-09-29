@@ -17,6 +17,11 @@ export interface ApifyConfig {
   maxChargeUsd: number | null;
   extraInput: Record<string, unknown>;
   baseUrl: string;
+  /** Chave da Google Places API (New). Opcional: soma uma segunda fonte de dados. */
+  googleApiKey: string | null;
+  googleBaseUrl: string;
+  /** Fontes configuradas no servidor. */
+  sources: { apify: boolean; google: boolean };
   demoMode: boolean;
   configError: string | null;
 }
@@ -39,6 +44,8 @@ export function getApifyConfig(): ApifyConfig {
   }
   if (!/^[A-Za-z0-9._~-]+$/.test(actorId)) configError = "APIFY_ACTOR_ID inválido.";
   const charge = Number.parseFloat(process.env.APIFY_MAX_CHARGE_USD ?? "");
+  const googleApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim() || null;
+  const forceDemo = process.env.NEXALEADS_DEMO_MODE === "true";
 
   return {
     token,
@@ -49,7 +56,10 @@ export function getApifyConfig(): ApifyConfig {
     maxChargeUsd: Number.isFinite(charge) && charge > 0 ? charge : null,
     extraInput,
     baseUrl: (process.env.APIFY_API_BASE_URL?.trim() || "https://api.apify.com").replace(/\/+$/, ""),
-    demoMode: !token || process.env.NEXALEADS_DEMO_MODE === "true",
+    googleApiKey,
+    googleBaseUrl: (process.env.GOOGLE_PLACES_BASE_URL?.trim() || "https://places.googleapis.com").replace(/\/+$/, ""),
+    sources: { apify: Boolean(token) && !forceDemo, google: Boolean(googleApiKey) && !forceDemo },
+    demoMode: forceDemo || (!token && !googleApiKey),
     configError,
   };
 }

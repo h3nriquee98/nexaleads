@@ -210,7 +210,7 @@ export function normalizePlace(item: RawPlace, ctx: NormalizeContext): Lead | nu
   const placeId = first(item, ["placeId", "cid", "id"]);
   const rawMapsUrl = first(item, ["url", "googleMapsUrl", "mapsUrl"]);
   const mapsUrl =
-    rawMapsUrl && /google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(rawMapsUrl)
+    rawMapsUrl && /google\.[a-z.]+\/maps|maps\.google\.[a-z.]+\/|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(rawMapsUrl)
       ? safeHttpUrl(rawMapsUrl)
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
           [name, address ?? city].filter(Boolean).join(" "),

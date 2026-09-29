@@ -1,6 +1,10 @@
 export type SiteStatus = "sem_site" | "possui_site" | "nao_identificado";
 export type WhatsAppStatus = "confirmado" | "provavel" | "nao";
-export type LeadSource = "apify" | "demo";
+export type LeadSource = "apify" | "google" | "demo";
+
+/** De onde buscar: Apify (Google Maps Scraper), Google Places API ou as duas juntas. */
+export type SearchSource = "apify" | "google" | "both";
+export type SearchMode = "demo" | "apify" | "google" | "both";
 
 export const LEAD_STATUSES = [
   { value: "novo", label: "Novo" },
@@ -76,12 +80,14 @@ export interface SearchParams {
   onlyNoSite: boolean;
   /** Manter só empresas com WhatsApp (confirmado ou celular). Filtro aplicado no servidor. */
   onlyWhatsApp: boolean;
+  /** Fonte dos dados. O servidor ajusta conforme as chaves configuradas. */
+  source: SearchSource;
 }
 
 export type SearchResponse =
   | {
       ok: true;
-      mode: "demo" | "apify";
+      mode: SearchMode;
       status: "SUCCEEDED" | "RUNNING" | "PARTIAL";
       runId?: string;
       leads?: Lead[];

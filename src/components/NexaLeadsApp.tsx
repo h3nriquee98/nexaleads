@@ -30,7 +30,7 @@ import { exportFileName, leadToText, leadsToCsv, leadsToText, leadsToXlsx } from
 import { STATUS_LABEL } from "@/lib/labels";
 import { clearAll, loadLastSearch, loadLeads, mergeLeads, saveLastSearch, saveLeads, updateLead, type LastSearch } from "@/lib/storage";
 import { searchKey } from "@/lib/validation";
-import type { Lead, LeadStatus, SearchParams, SearchResponse, StoredLead } from "@/lib/types";
+import type { Lead, LeadStatus, SearchMode, SearchParams, SearchResponse, StoredLead } from "@/lib/types";
 
 const PAGE_SIZE = 24;
 const POLL_INTERVAL_MS = 5000;
@@ -38,7 +38,8 @@ const MAX_POLL_MS = 20 * 60 * 1000;
 const RECENT_SEARCH_MS = 10 * 60 * 1000;
 
 interface AppStatus {
-  mode: "demo" | "apify" | "unknown";
+  mode: "demo" | "live" | "unknown";
+  sources?: { apify: boolean; google: boolean };
   maxLeads: number;
   actorId?: string;
   configError?: string | null;
@@ -102,6 +103,11 @@ const ERROR_TITLES: Record<string, string> = {
   VALIDATION_ERROR: "Confira os campos da busca",
   NETWORK_ERROR: "Sem conexão com o servidor",
   NO_RESULTS: "Nenhum resultado encontrado",
+  GOOGLE_RATE_LIMIT: "Limite da Google Places API atingido",
+  GOOGLE_INVALID_KEY: "Chave do Google inválida",
+  GOOGLE_API_DISABLED: "Places API (New) desativada",
+  GOOGLE_BILLING: "Faturamento do Google Cloud desativado",
+  GOOGLE_FORBIDDEN: "Google recusou a chave",
 };
 
 export default function NexaLeadsApp() {
@@ -120,6 +126,8 @@ export default function NexaLeadsApp() {
 
   const inFlight = useRef(false);
   const leadsRef = useRef<StoredLead[]>([]);
+  /** Busca em andamento: ID e leads já recebidos (Google chega antes do Apify quando as duas fontes estão ativas). */
+  const activeSearch = useRef<{ id: string; collected: Map<string, Lead> } | null>(null);
   const searchToken = useRef(0);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -157,16 +165,31 @@ export default function NexaLeadsApp() {
     setStorageWarning(!saveLeads(next));
   }, []);
 
-  const finishSearch = useCallback(
-    (params: SearchParams, found: Lead[], mode: "demo" | "apify", message?: string) => {
-      const id = `s_${Date.now().toString(36)}`;
-      const merged = mergeLeads(leadsRef.current, found, id);
-      persist(merged);
-      const record: LastSearch = { id, params, at: new Date().toISOString(), count: found.length, mode };
+  /** Salva resultados (parciais ou finais) da busca atual na base local. */
+  const addResults = useCallback(
+    (params: SearchParams, found: Lead[], mode: SearchMode) => {
+      const current = activeSearch.current ?? { id: `s_${Date.now().toString(36)}`, collected: new Map<string, Lead>() };
+      activeSearch.current = current;
+      for (const lead of found) current.collected.set(lead.id, lead);
+      if (found.length > 0) persist(mergeLeads(leadsRef.current, found, current.id));
+      const record: LastSearch = { id: current.id, params, at: new Date().toISOString(), count: current.collected.size, mode };
       setLastSearch(record);
       saveLastSearch(record);
+      if (current.collected.size > 0) {
+        setFilters({ ...DEFAULT_FILTERS, onlyLastSearch: true, onlyNoSite: params.onlyNoSite, withWhatsApp: params.onlyWhatsApp });
+        setPage(1);
+      }
+    },
+    [persist],
+  );
+
+  const finishSearch = useCallback(
+    (params: SearchParams, found: Lead[], mode: SearchMode, message?: string) => {
+      addResults(params, found, mode);
+      const all = [...(activeSearch.current?.collected.values() ?? [])];
+      activeSearch.current = null;
       setSearch({ phase: "idle" });
-      if (found.length === 0) {
+      if (all.length === 0) {
         setSearch({
           phase: "error",
           code: "NO_RESULTS",
@@ -177,15 +200,25 @@ export default function NexaLeadsApp() {
         });
         return;
       }
-      setFilters({ ...DEFAULT_FILTERS, onlyLastSearch: true, onlyNoSite: params.onlyNoSite, withWhatsApp: params.onlyWhatsApp });
-      setPage(1);
-      const noSite = found.filter((l) => l.siteStatus === "sem_site").length;
-      push("success", `${found.length} lead${found.length === 1 ? "" : "s"} encontrado${found.length === 1 ? "" : "s"} · ${noSite} sem site.`);
+      const noSite = all.filter((l) => l.siteStatus === "sem_site").length;
+      push("success", `${all.length} lead${all.length === 1 ? "" : "s"} encontrado${all.length === 1 ? "" : "s"} · ${noSite} sem site.`);
       if (message) push("info", message);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     },
-    [persist, push],
+    [addResults, push],
   );
+
+  /** Erro depois de já ter recebido leads (ex.: Google chegou, Apify falhou): avisa sem perder o que veio. */
+  const failSearch = useCallback((params: SearchParams, code: string, message: string) => {
+    const saved = activeSearch.current?.collected.size ?? 0;
+    activeSearch.current = null;
+    setSearch({
+      phase: "error",
+      code,
+      message: saved > 0 ? `${message} Os ${saved} leads já recebidos do Google Places foram salvos.` : message,
+      params,
+    });
+  }, []);
 
   const poll = useCallback(
     async (token: number, params: SearchParams, runId: string, startedAt: number) => {
@@ -197,6 +230,7 @@ export default function NexaLeadsApp() {
         limit: String(params.limit),
         onlyNoSite: params.onlyNoSite ? "1" : "0",
         onlyWhatsApp: params.onlyWhatsApp ? "1" : "0",
+        source: params.source,
       });
       params.niches.forEach((n) => qs.append("niche", n));
       let failures = 0;
@@ -204,7 +238,7 @@ export default function NexaLeadsApp() {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         if (searchToken.current !== token) return;
         if (Date.now() - startedAt > MAX_POLL_MS) {
-          setSearch({ phase: "error", code: "TIMEOUT", message: "A busca está demorando mais que o esperado. Tente novamente com menos nichos ou uma quantidade menor.", params });
+          failSearch(params, "TIMEOUT", "A busca está demorando mais que o esperado. Tente novamente com menos nichos ou uma quantidade menor.");
           break;
         }
         try {
@@ -214,38 +248,39 @@ export default function NexaLeadsApp() {
           failures = 0;
           if (!data.ok && data.code === "UNAUTHORIZED") return goToLogin();
           if (!data.ok) {
-            setSearch({ phase: "error", code: data.code, message: data.message, params });
+            failSearch(params, data.code, data.message);
             break;
           }
           if (data.status === "RUNNING") {
             setSearch((s) => (s.phase === "running" ? { ...s, message: data.message ?? s.message } : s));
             continue;
           }
-          finishSearch(params, data.leads ?? [], "apify", data.message);
+          finishSearch(params, data.leads ?? [], data.mode, data.message);
           break;
         } catch {
           failures += 1;
           if (failures >= 3) {
-            setSearch({ phase: "error", code: "NETWORK_ERROR", message: "Perdemos a conexão enquanto acompanhávamos a busca. Verifique sua internet e tente novamente.", params });
+            failSearch(params, "NETWORK_ERROR", "Perdemos a conexão enquanto acompanhávamos a busca. Verifique sua internet e tente novamente.");
             break;
           }
         }
       }
       inFlight.current = false;
     },
-    [finishSearch],
+    [failSearch, finishSearch],
   );
 
   const runSearch = useCallback(
     async (params: SearchParams) => {
       if (inFlight.current) return; // evita requisições duplicadas
-      if (status.mode === "apify" && lastSearch && searchKey(lastSearch.params) === searchKey(params)) {
+      if (status.mode === "live" && lastSearch && searchKey(lastSearch.params) === searchKey(params)) {
         const age = Date.now() - new Date(lastSearch.at).getTime();
-        if (age < RECENT_SEARCH_MS && !window.confirm("Você fez exatamente esta busca há poucos minutos. Buscar de novo gera um novo custo no Apify. Deseja continuar?")) {
+        if (age < RECENT_SEARCH_MS && !window.confirm("Você fez exatamente esta busca há poucos minutos. Buscar de novo gera um novo custo nas APIs. Deseja continuar?")) {
           return;
         }
       }
       inFlight.current = true;
+      activeSearch.current = { id: `s_${Date.now().toString(36)}`, collected: new Map() };
       const token = ++searchToken.current;
       const startedAt = Date.now();
       setNow(startedAt);
@@ -269,7 +304,19 @@ export default function NexaLeadsApp() {
           inFlight.current = false;
           return;
         }
-        setSearch({ phase: "running", params, startedAt, runId: data.runId, message: data.message ?? "Coletando empresas no Google Maps via Apify…" });
+        // Com as duas fontes, o Google Places já respondeu: mostra esses leads enquanto o Apify termina.
+        if (data.leads && data.leads.length > 0) {
+          addResults(params, data.leads, data.mode);
+          push("info", `${data.leads.length} leads do Google Places já estão na lista. O Apify continua buscando mais…`);
+        }
+        if (data.message) push("info", data.message);
+        setSearch({
+          phase: "running",
+          params,
+          startedAt,
+          runId: data.runId,
+          message: data.leads?.length ? "Coletando mais empresas no Google Maps via Apify…" : "Coletando empresas no Google Maps via Apify…",
+        });
         void poll(token, params, data.runId, startedAt);
       } catch {
         if (searchToken.current === token) {
@@ -278,13 +325,14 @@ export default function NexaLeadsApp() {
         inFlight.current = false;
       }
     },
-    [finishSearch, lastSearch, poll, status.mode],
+    [addResults, finishSearch, lastSearch, poll, push, status.mode],
   );
 
   const cancelSearch = useCallback(async () => {
     const current = search;
     searchToken.current += 1;
     inFlight.current = false;
+    activeSearch.current = null;
     setSearch({ phase: "idle" });
     if (current.phase === "running" && current.runId) {
       try {
@@ -403,7 +451,7 @@ export default function NexaLeadsApp() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
             className={`badge ${
-              status.mode === "apify"
+              status.mode === "live"
                 ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
                 : status.mode === "demo"
                   ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
@@ -411,8 +459,16 @@ export default function NexaLeadsApp() {
             }`}
             title={status.actorId ? `Actor: ${status.actorId}` : undefined}
           >
-            <span className={`size-1.5 rounded-full ${status.mode === "apify" ? "bg-emerald-300" : status.mode === "demo" ? "bg-amber-300" : "bg-slate-400"}`} />
-            {status.mode === "apify" ? "Apify conectado" : status.mode === "demo" ? "Modo demonstração" : "Verificando conexão…"}
+            <span className={`size-1.5 rounded-full ${status.mode === "live" ? "bg-emerald-300" : status.mode === "demo" ? "bg-amber-300" : "bg-slate-400"}`} />
+            {status.mode === "live"
+              ? status.sources?.apify && status.sources?.google
+                ? "Apify + Google conectados"
+                : status.sources?.google
+                  ? "Google Places conectado"
+                  : "Apify conectado"
+              : status.mode === "demo"
+                ? "Modo demonstração"
+                : "Verificando conexão…"}
           </span>
           <span className="badge border-line-strong text-muted" title="Os leads e status ficam salvos apenas no navegador deste dispositivo.">
             <DatabaseIcon size={12} /> Dados só neste dispositivo
@@ -429,9 +485,9 @@ export default function NexaLeadsApp() {
         <div className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100" role="note">
           <InfoIcon className="mt-0.5 shrink-0" />
           <p>
-            <strong>Modo demonstração:</strong> o token do Apify ainda não foi configurado, então as buscas geram <strong>dados fictícios</strong> (marcados como
-            “Fictício”) apenas para testar a interface. Configure <code className="rounded bg-black/30 px-1">APIFY_API_TOKEN</code> e{" "}
-            <code className="rounded bg-black/30 px-1">APIFY_ACTOR_ID</code> para buscar empresas reais.
+            <strong>Modo demonstração:</strong> nenhuma fonte de dados foi configurada, então as buscas geram <strong>dados fictícios</strong> (marcados como
+            “Fictício”) apenas para testar a interface. Configure <code className="rounded bg-black/30 px-1">APIFY_API_TOKEN</code> e/ou{" "}
+            <code className="rounded bg-black/30 px-1">GOOGLE_MAPS_API_KEY</code> para buscar empresas reais.
           </p>
         </div>
       )}
@@ -441,7 +497,7 @@ export default function NexaLeadsApp() {
         </div>
       )}
 
-      <SearchForm busy={busy} maxLeads={status.maxLeads} initial={lastSearch?.params} onSearch={runSearch} key={lastSearch ? "loaded" : "empty"} />
+      <SearchForm busy={busy} maxLeads={status.maxLeads} sources={status.sources} initial={lastSearch?.params} onSearch={runSearch} key={lastSearch ? "loaded" : "empty"} />
 
       {/* Carregamento */}
       {search.phase === "running" && (
@@ -458,7 +514,7 @@ export default function NexaLeadsApp() {
                 </p>
                 <p className="text-sm text-muted">
                   {search.message ?? "Processando…"} · {formatElapsed(now - search.startedAt)}
-                  {status.mode === "apify" && " · buscas reais costumam levar de 1 a 5 minutos"}
+                  {search.runId && " · o Apify costuma levar de 1 a 5 minutos"}
                 </p>
               </div>
             </div>

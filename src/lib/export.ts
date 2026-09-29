@@ -48,7 +48,7 @@ export function leadToRow(lead: StoredLead): Cell[] {
     lead.instagram,
     STATUS_LABEL[lead.status],
     formatDateTime(lead.collectedAt),
-    lead.source === "demo" ? "Demonstração (fictício)" : "Apify / Google Maps",
+    lead.source === "demo" ? "Demonstração (fictício)" : lead.source === "google" ? "Google Places API" : "Apify / Google Maps",
   ];
 }
 

@@ -12,6 +12,9 @@ const config: ApifyConfig = {
   maxChargeUsd: null,
   extraInput: {},
   baseUrl: "https://api.apify.com",
+  googleApiKey: null,
+  googleBaseUrl: "https://places.googleapis.com",
+  sources: { apify: true, google: false },
   demoMode: false,
   configError: null,
 };

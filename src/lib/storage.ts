@@ -1,5 +1,5 @@
 import { compareLeads } from "./scoring";
-import type { Lead, LeadStatus, SearchParams, StoredLead } from "./types";
+import type { Lead, LeadStatus, SearchMode, SearchParams, StoredLead } from "./types";
 
 /**
  * Persistência local (somente neste navegador/dispositivo).
@@ -13,7 +13,7 @@ export interface LastSearch {
   params: SearchParams;
   at: string;
   count: number;
-  mode: "demo" | "apify";
+  mode: SearchMode;
 }
 
 function storage(): Storage | null {

@@ -5,7 +5,7 @@ import { getAuthConfig } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-/** Informa ao frontend se o Apify está configurado — sem nunca revelar o token. */
+/** Informa ao frontend quais fontes estão configuradas — sem nunca revelar tokens ou chaves. */
 export async function GET(request: Request) {
   if (!(await requestIsAuthorized(request))) {
     return NextResponse.json({ ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." }, { status: 401 });
@@ -13,7 +13,8 @@ export async function GET(request: Request) {
   const config = getApifyConfig();
   return NextResponse.json(
     {
-      mode: config.demoMode ? "demo" : "apify",
+      mode: config.demoMode ? "demo" : "live",
+      sources: config.sources,
       actorId: config.actorId.replace("~", "/"),
       maxLeads: config.maxLeads,
       configError: config.configError,

@@ -63,9 +63,10 @@ export function validateSearch(input: unknown, maxLimit = 100): ValidationResult
   const flag = (v: unknown) => v === true || v === "true" || v === "1";
   const onlyNoSite = flag(raw.onlyNoSite);
   const onlyWhatsApp = flag(raw.onlyWhatsApp);
+  const source = raw.source === "apify" || raw.source === "google" ? raw.source : "both";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { city, state, country, niches, limit, onlyNoSite, onlyWhatsApp } };
+  return { ok: true, value: { city, state, country, niches, limit, onlyNoSite, onlyWhatsApp, source } };
 }
 
 export function searchKey(params: SearchParams): string {
@@ -77,6 +78,7 @@ export function searchKey(params: SearchParams): string {
     params.limit,
     params.onlyNoSite,
     params.onlyWhatsApp,
+    params.source,
   ]);
 }
 

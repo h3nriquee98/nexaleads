@@ -30,5 +30,19 @@ export default defineConfig({
       reuseExistingServer: true,
       env: { APIFY_API_TOKEN: "test-token", APIFY_ACTOR_ID: "compass/crawler-google-places", APIFY_API_BASE_URL: "http://localhost:4010", APIFY_MAX_LEADS: "50", NEXALEADS_PASSWORD: "senha-de-teste-123" },
     },
+    {
+      command: "npx next start -p 3102",
+      port: 3102,
+      reuseExistingServer: true,
+      env: {
+        APIFY_API_TOKEN: "test-token",
+        APIFY_ACTOR_ID: "compass/crawler-google-places",
+        APIFY_API_BASE_URL: "http://localhost:4010",
+        GOOGLE_MAPS_API_KEY: "test-google-key",
+        GOOGLE_PLACES_BASE_URL: "http://localhost:4010",
+        APIFY_MAX_LEADS: "50",
+        NEXALEADS_PASSWORD: "senha-de-teste-123",
+      },
+    },
   ],
 });

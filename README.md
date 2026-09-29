@@ -13,6 +13,7 @@ Aplicação web de uso interno da **Nexa Agency** para encontrar empresas e poss
 - **Apenas empresas com WhatsApp**: opção ao lado da anterior. Descarta leads sem WhatsApp confirmado e sem celular (fixos e sem telefone). O Google Maps não tem esse filtro, então o app busca o dobro de empresas no Apify e entrega até a quantidade pedida. Isso consome mais créditos.
 - **Quantidade de leads** configurável, com limite máximo por busca para controlar custos.
 - **Integração segura com Apify**: o token fica só no servidor (variáveis de ambiente) e nunca vai para o navegador.
+- **Google Places API (opcional)**: segunda fonte de dados, oficial do Google e com resposta em segundos. Com as duas configuradas, você escolhe na busca entre **Apify + Google** (padrão), **Só Google Places** ou **Só Apify**. Os resultados são unidos pelo ID do lugar no Google, então a mesma empresa nunca aparece duas vezes.
 - **Pontuação de 0 a 100** e ordenação automática, com etiqueta **“Sem site”**.
 - **Cards ou tabela** com nome, categoria/nicho, endereço, telefone, WhatsApp, nota, avaliações, site, Google Maps, Instagram, status do site, pontuação e data da coleta.
 - **Filtros**: apenas sem site, com telefone, com WhatsApp, nota mínima, avaliações mínimas, nicho, cidade, status, pontuação mínima, texto livre, somente a última busca e descartados.
@@ -64,6 +65,18 @@ npm run dev
 ```
 
 Acesse http://localhost:3000. Sem token configurado, o app entra automaticamente em **modo demonstração**.
+
+## Google Places API (opcional)
+
+1. No [Google Cloud Console](https://console.cloud.google.com/), ative a **Places API (New)** no projeto (o faturamento precisa estar ativo).
+2. Em **APIs e serviços → Credenciais**, crie uma chave de API e **restrinja-a à Places API (New)**.
+3. Cadastre a chave na variável `GOOGLE_MAPS_API_KEY` (na Vercel: Settings → Environment Variables) e faça um novo deploy.
+
+Como funciona:
+- Usa o endpoint Text Search (`places:searchText`) com a busca “{nicho} em {cidade}, {UF}, {país}”, em português. Pede apenas os campos necessários: nome, endereço, telefone, site, nota, avaliações, link do Maps e status.
+- Cada requisição traz até 20 empresas, e cada consulta chega a no máximo 60. Com “apenas sem site”, pede mais resultados, porque o Google não filtra por site e o servidor descarta os que têm site.
+- **Apify + Google**: o Google responde em segundos e os leads já aparecem na lista. O Apify continua em segundo plano e completa a lista quando termina. Cada fonte traz até a quantidade pedida.
+- Custo: o Text Search com telefone e site é cobrado no nível “Enterprise” da Places API. Confira a cota gratuita mensal e os preços atuais na [página de preços do Google Maps Platform](https://mapsplatform.google.com/pricing/).
 
 ## Senha de acesso (login sem banco de dados)
 
@@ -134,7 +147,7 @@ Buscas idênticas feitas em sequência (duplo clique, recarregar a página) reap
 
 1. Envie o repositório para o GitHub.
 2. Na Vercel: **Add New → Project** → importe o repositório. O framework **Next.js** é detectado automaticamente.
-3. Em **Settings → Environment Variables**, cadastre `APIFY_API_TOKEN`, `APIFY_ACTOR_ID` e `NEXALEADS_PASSWORD` (e, se quiser, `NEXALEADS_SESSION_SECRET` e as opcionais).
+3. Em **Settings → Environment Variables**, cadastre `APIFY_API_TOKEN`, `APIFY_ACTOR_ID`, `GOOGLE_MAPS_API_KEY` (opcional) e `NEXALEADS_PASSWORD` (e, se quiser, `NEXALEADS_SESSION_SECRET` e as opcionais).
 4. Faça o deploy. Cada chamada da API é curta, pois o acompanhamento é feito por polling, e funciona no plano Hobby.
 
 > O app já exige senha própria. Se quiser uma camada extra, a Vercel também oferece **Vercel Authentication** (Settings → Deployment Protection).

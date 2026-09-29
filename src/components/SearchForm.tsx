@@ -3,19 +3,27 @@
 import { useState } from "react";
 import { BR_STATES, NICHE_GROUPS, POPULAR_NICHES } from "@/lib/niches";
 import { DEFAULT_LIMIT, MAX_NICHES, validateSearch } from "@/lib/validation";
-import type { SearchParams } from "@/lib/types";
+import type { SearchParams, SearchSource } from "@/lib/types";
 import { CheckIcon, LoaderIcon, MapPinIcon, PlusIcon, SearchIcon, XIcon } from "./Icons";
 
 interface Props {
   busy: boolean;
   maxLeads: number;
   initial?: SearchParams | null;
+  /** Fontes configuradas no servidor. O seletor só aparece quando as duas existem. */
+  sources?: { apify: boolean; google: boolean };
   onSearch: (params: SearchParams) => void;
 }
 
+const SOURCE_OPTIONS: { value: SearchSource; label: string; hint: string }[] = [
+  { value: "both", label: "Apify + Google", hint: "Mais leads: junta as duas fontes" },
+  { value: "google", label: "Só Google Places", hint: "Resultado em segundos" },
+  { value: "apify", label: "Só Apify", hint: "Google Maps Scraper (1 a 5 min)" },
+];
+
 type Errors = Partial<Record<keyof SearchParams, string>>;
 
-export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props) {
+export default function SearchForm({ busy, maxLeads, initial, sources, onSearch }: Props) {
   const [city, setCity] = useState(initial?.city ?? "");
   const [state, setState] = useState(initial?.state ?? "SP");
   const [country, setCountry] = useState(initial?.country ?? "Brasil");
@@ -24,6 +32,8 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
   const [limit, setLimit] = useState(String(initial?.limit ?? DEFAULT_LIMIT));
   const [onlyNoSite, setOnlyNoSite] = useState(initial?.onlyNoSite ?? false);
   const [onlyWhatsApp, setOnlyWhatsApp] = useState(initial?.onlyWhatsApp ?? false);
+  const [source, setSource] = useState<SearchSource>(initial?.source ?? "both");
+  const showSources = Boolean(sources?.apify && sources?.google);
   const [errors, setErrors] = useState<Errors>({});
 
   const isBrazil = /^(brasil|brazil)$/i.test(country.trim());
@@ -56,7 +66,7 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
     e.preventDefault();
     if (busy) return;
     const pending = custom.trim() ? [...niches, custom.trim()] : niches;
-    const result = validateSearch({ city, state, country, niches: pending, limit, onlyNoSite, onlyWhatsApp }, maxLeads);
+    const result = validateSearch({ city, state, country, niches: pending, limit, onlyNoSite, onlyWhatsApp, source }, maxLeads);
     if (!result.ok) {
       setErrors(result.errors);
       return;
@@ -224,6 +234,37 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
           {errors.niches && <p className="mt-1 text-xs text-bad">{errors.niches}</p>}
         </fieldset>
 
+        {showSources && (
+          <fieldset className="sm:col-span-12">
+            <legend className="mb-1.5 text-sm font-medium">Fonte dos dados</legend>
+            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Fonte dos dados">
+              {SOURCE_OPTIONS.map((option) => {
+                const active = source === option.value;
+                return (
+                  <button
+                    type="button"
+                    key={option.value}
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setSource(option.value)}
+                    className={`rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                      active ? "border-indigo-400/60 bg-indigo-400/15" : "border-line-strong bg-white/[0.02] hover:border-indigo-300/40"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <span className={`grid size-4 place-items-center rounded-full border ${active ? "border-indigo-300" : "border-faint"}`} aria-hidden>
+                        {active && <span className="size-2 rounded-full bg-indigo-300" />}
+                      </span>
+                      {option.label}
+                    </span>
+                    <span className="mt-0.5 block pl-6 text-xs text-muted">{option.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+
         <div className="sm:col-span-4">
           <label htmlFor="limit" className="mb-1.5 block text-sm font-medium">
             Quantidade de leads <span className="font-normal text-faint">(opcional)</span>
@@ -253,7 +294,7 @@ export default function SearchForm({ busy, maxLeads, initial, onSearch }: Props)
             checked={onlyNoSite}
             onChange={setOnlyNoSite}
             title="Buscar apenas empresas sem site"
-            description="O Google Maps Scraper já filtra na busca: só vêm empresas sem site."
+            description="Só traz empresas sem site cadastrado no Google (filtro já aplicado na busca)."
           />
           <ToggleCard
             checked={onlyWhatsApp}

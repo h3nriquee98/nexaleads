@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { getApifyConfig } from "@/server/config";
+import { getApifyConfig, type ApifyConfig } from "@/server/config";
 import { ApifyError, abortRun, getRun, getRunItems, startRun } from "@/server/apify";
 import { generateDemoPlaces } from "@/server/demo";
+import { GooglePlacesError, searchGooglePlaces } from "@/server/google-places";
 import { requestIsAuthorized } from "@/server/auth";
 import { forgetRun, forgetRunId, getRecentRun, isSameOrigin, rateLimit, rememberRun } from "@/server/guards";
 import { normalizePlaces } from "@/lib/normalize";
 import { fetchLimit, searchKey, validateSearch } from "@/lib/validation";
-import type { Lead, SearchParams, SearchResponse } from "@/lib/types";
+import type { Lead, SearchParams, SearchResponse, SearchSource } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,7 +25,7 @@ function fail(code: string, message: string, status: number) {
 const unauthorized = () => fail("UNAUTHORIZED", "Sessão expirada ou não autenticada. Faça login novamente.", 401);
 
 function handleError(error: unknown) {
-  if (error instanceof ApifyError) return fail(error.code, error.message, error.httpStatus);
+  if (error instanceof ApifyError || error instanceof GooglePlacesError) return fail(error.code, error.message, error.httpStatus);
   console.error("[search-leads] erro inesperado", error instanceof Error ? error.message : error);
   return fail("INTERNAL_ERROR", "Erro interno ao processar a busca. Tente novamente.", 500);
 }
@@ -38,8 +39,20 @@ function handleError(error: unknown) {
 function applySiteFilter(leads: Lead[], params: SearchParams): Lead[] {
   let result = leads;
   if (params.onlyNoSite) result = result.filter((l) => l.siteStatus === "sem_site");
-  if (params.onlyWhatsApp) result = result.filter((l) => l.whatsappStatus !== "nao").slice(0, params.limit);
-  return result;
+  if (params.onlyWhatsApp) result = result.filter((l) => l.whatsappStatus !== "nao");
+  return result.slice(0, params.limit);
+}
+
+/** Ajusta a fonte pedida às chaves configuradas no servidor. */
+function resolveSource(requested: SearchSource, config: ApifyConfig): SearchSource {
+  const { apify, google } = config.sources;
+  if (requested === "both") return apify && google ? "both" : apify ? "apify" : "google";
+  if (requested === "google") return google ? "google" : "apify";
+  return apify ? "apify" : "google";
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "erro desconhecido";
 }
 
 function firstValidationError(errors: Partial<Record<keyof SearchParams, string>>): string {
@@ -76,22 +89,78 @@ export async function POST(request: Request) {
       mode: "demo",
       status: "SUCCEEDED",
       leads,
-      message: "Modo demonstração: dados fictícios gerados localmente. Configure o APIFY_API_TOKEN para buscar leads reais.",
+      message: "Modo demonstração: dados fictícios gerados localmente. Configure o APIFY_API_TOKEN ou a GOOGLE_MAPS_API_KEY para buscar leads reais.",
     });
   }
 
-  try {
-    const key = searchKey(params);
-    const cachedRunId = getRecentRun(key);
-    if (cachedRunId) {
-      return json({ ok: true, mode: "apify", status: "RUNNING", runId: cachedRunId, message: "Reaproveitando uma busca idêntica iniciada há pouco." });
-    }
-    const run = await startRun(params, config);
-    rememberRun(key, run.id);
-    return json({ ok: true, mode: "apify", status: "RUNNING", runId: run.id });
-  } catch (error) {
-    return handleError(error);
+  const source = resolveSource(params.source, config);
+  let googleLeads: Lead[] | null = null;
+  let googleError: unknown = null;
+  let runId: string | null = null;
+  let reused = false;
+  let apifyError: unknown = null;
+
+  // Google Places responde na hora; o Apify roda em segundo plano e é acompanhado pelo GET.
+  await Promise.all([
+    source !== "apify"
+      ? searchGooglePlaces(params, config)
+          .then((items) => {
+            googleLeads = applySiteFilter(normalizePlaces(items, { ...params, source: "google" }), params);
+          })
+          .catch((error) => {
+            googleError = error;
+          })
+      : null,
+    source !== "google"
+      ? (async () => {
+          const key = searchKey(params);
+          const cached = getRecentRun(key);
+          if (cached) {
+            runId = cached;
+            reused = true;
+            return;
+          }
+          const run = await startRun(params, config);
+          rememberRun(key, run.id);
+          runId = run.id;
+        })().catch((error) => {
+          apifyError = error;
+        })
+      : null,
+  ]);
+
+  if (source === "google") {
+    if (googleError) return handleError(googleError);
+    return json({ ok: true, mode: "google", status: "SUCCEEDED", leads: googleLeads ?? [] });
   }
+  if (source === "apify") {
+    if (apifyError) return handleError(apifyError);
+    return json({ ok: true, mode: "apify", status: "RUNNING", runId: runId!, message: reused ? "Reaproveitando uma busca idêntica iniciada há pouco." : undefined });
+  }
+
+  // As duas fontes
+  if (apifyError && googleError) {
+    const response = handleError(apifyError);
+    const body = (await response.json()) as { code: string; message: string };
+    return fail(body.code, `${body.message} Google Places: ${errorMessage(googleError)}`, response.status);
+  }
+  if (apifyError) {
+    return json({
+      ok: true,
+      mode: "google",
+      status: "SUCCEEDED",
+      leads: googleLeads ?? [],
+      message: `O Apify falhou (${errorMessage(apifyError)}). Mostrando só os resultados do Google Places.`,
+    });
+  }
+  return json({
+    ok: true,
+    mode: "both",
+    status: "RUNNING",
+    runId: runId!,
+    leads: googleLeads ?? [],
+    message: googleError ? `Google Places falhou (${errorMessage(googleError)}). Continuando só com o Apify.` : undefined,
+  });
 }
 
 /** Consulta o andamento da execução e, quando terminar, devolve os leads normalizados. */
